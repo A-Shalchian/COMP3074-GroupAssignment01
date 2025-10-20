@@ -4,7 +4,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -13,6 +12,7 @@ import androidx.compose.material.icons.filled.Restaurant
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -27,7 +27,7 @@ import ca.gbc.comp3074.assignment.navigation.Screen
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RestaurantListScreen(navController: NavController) {
-    // Placeholder data with colors for variety
+    //list of restaurant
     val restaurants = remember {
         listOf(
             Triple("Bella Italia", "123 Main St, Downtown", 4),
@@ -37,34 +37,41 @@ fun RestaurantListScreen(navController: NavController) {
         )
     }
 
-    val placeholderColors = listOf(
-        Color(0xFFFFE5B4), // Peach
-        Color(0xFFE8F5E9), // Light Green
-        Color(0xFFE3F2FD), // Light Blue
-        Color(0xFFFFF9C4)  // Light Yellow
+    //tags
+    val restaurantTags = listOf(
+        listOf("Italian", "Pasta", "Vegetarian"),
+        listOf("Japanese", "Sushi", "Seafood"),
+        listOf("Vegan", "Organic", "Cafe"),
+        listOf("Indian", "Spicy", "Curry")
     )
+
+    //for the search input
+    var searchQuery by rememberSaveable { mutableStateOf("") }
+
+    //search either with the name or tags
+    val filteredList = remember(searchQuery) {
+        val q = searchQuery.trim().lowercase()
+        if (q.isEmpty()) restaurants
+        else restaurants.filterIndexed { index, triple ->
+            triple.first.lowercase().contains(q) ||
+                    restaurantTags[index].any { it.lowercase().contains(q) }
+        }
+    }
 
     Scaffold(
         topBar = {
+            //title and about button
             TopAppBar(
                 title = { Text("My Restaurants", fontWeight = FontWeight.Medium) },
                 actions = {
-                    IconButton(
-                        onClick = { /* TODO: Search */ },
-                        modifier = Modifier.semantics { contentDescription = "Search restaurants" }
-                    ) {
-                        Icon(Icons.Default.Search, contentDescription = null)
-                    }
-                    IconButton(
-                        onClick = { navController.navigate(Screen.About.route) },
-                        modifier = Modifier.semantics { contentDescription = "About app" }
-                    ) {
-                        Icon(Icons.Default.Info, contentDescription = null)
+                    IconButton(onClick = { navController.navigate(Screen.About.route) }) {
+                        Icon(Icons.Default.Info, contentDescription = "About")
                     }
                 }
             )
         },
         floatingActionButton = {
+            //add a new restaurant
             FloatingActionButton(
                 onClick = { navController.navigate(Screen.AddEditRestaurant.createRoute()) },
                 modifier = Modifier.semantics { contentDescription = "Add new restaurant" }
@@ -73,21 +80,55 @@ fun RestaurantListScreen(navController: NavController) {
             }
         }
     ) { padding ->
-        LazyColumn(
+        Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(padding),
-            contentPadding = PaddingValues(vertical = 8.dp)
+                .padding(padding)
         ) {
-            items(restaurants.size) { index ->
-                val (name, address, rating) = restaurants[index]
-                RestaurantCard(
-                    name = name,
-                    address = address,
-                    rating = rating,
-                    backgroundColor = placeholderColors[index % placeholderColors.size],
-                    onClick = { navController.navigate(Screen.RestaurantDetails.createRoute("$index")) }
-                )
+            //filters restaurant in real time
+            OutlinedTextField(
+                value = searchQuery,
+                onValueChange = { searchQuery = it },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                label = { Text("Search by name or tag") },
+                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                singleLine = true
+            )
+
+            // display the searched restaurants
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(bottom = 16.dp)
+            ) {
+                //showing only matching restaurants
+                items(filteredList.size) { index ->
+                    val (name, address, rating) = filteredList[index]
+                    RestaurantCard(
+                        name = name,
+                        address = address,
+                        rating = rating,
+                        backgroundColor = listOf(
+                            Color(0xFFFFE5B4),
+                            Color(0xFFE8F5E9),
+                            Color(0xFFE3F2FD),
+                            Color(0xFFFFF9C4)
+                        )[index % 4],
+                        onClick = { navController.navigate(Screen.RestaurantDetails.createRoute("$index")) }
+                    )
+                }
+                //message if now restaurant found
+                if (filteredList.isEmpty()) {
+                    item {
+                        Text(
+                            text = "No restaurants found.",
+                            modifier = Modifier.padding(16.dp),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
             }
         }
     }
@@ -101,7 +142,7 @@ fun RestaurantCard(
     backgroundColor: Color,
     onClick: () -> Unit
 ) {
-    Card(
+    Card(//reusable card that shows the restaurant info
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 6.dp)
@@ -115,7 +156,7 @@ fun RestaurantCard(
                 .padding(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Circular placeholder image
+            //image placeholder
             Box(
                 modifier = Modifier
                     .size(64.dp)
@@ -167,3 +208,5 @@ fun RestaurantCard(
         }
     }
 }
+
+
