@@ -9,9 +9,13 @@ import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import ca.gbc.comp3074.assignment.navigation.Screen
+import android.content.ActivityNotFoundException
+import android.content.Intent
+import android.net.Uri
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -116,14 +120,32 @@ fun RestaurantDetailsScreen(
             Spacer(modifier = Modifier.height(32.dp))
 
             //map and share button
+            val context = LocalContext.current
+
             Button(
-                onClick = { navController.navigate(Screen.MapScreen.createRoute(restaurantId ?: "1")) },
+                onClick = {
+                    val gmmIntentUri = Uri.parse("geo:0,0?q=${Uri.encode(address)}")
+                    val mapIntent = Intent(Intent.ACTION_VIEW, gmmIntentUri)
+                    mapIntent.setPackage("com.google.android.apps.maps")
+
+                    try {
+                        context.startActivity(mapIntent)
+                    } catch (e: ActivityNotFoundException) {
+                        // Fallback if Google Maps isn’t installed
+                        val webIntent = Intent(
+                            Intent.ACTION_VIEW,
+                            Uri.parse("https://www.google.com/maps/search/?api=1&query=${Uri.encode(address)}")
+                        )
+                        context.startActivity(webIntent)
+                    }
+                },
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Icon(Icons.Default.Map, contentDescription = null)
                 Spacer(modifier = Modifier.width(8.dp))
                 Text("View on Map")
             }
+
 
             Spacer(modifier = Modifier.height(8.dp))
 
