@@ -2,20 +2,22 @@ package ca.gbc.comp3074.assignment.screens
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.Map
-import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
+import ca.gbc.comp3074.assignment.data.Restaurant
+import ca.gbc.comp3074.assignment.data.RestaurantDatabase
+import ca.gbc.comp3074.assignment.data.RestaurantRepository
 import ca.gbc.comp3074.assignment.navigation.Screen
 import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.net.Uri
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -23,28 +25,30 @@ fun RestaurantDetailsScreen(
     navController: NavController,
     restaurantId: String?
 ) {
-    //restaurant list
-    val restaurants = listOf(
-        Triple("Bella Italia", "123 Main St, Downtown", 4),
-        Triple("Sushi Paradise", "456 Oak Ave, Midtown", 5),
-        Triple("Green Garden Café", "789 Pine Rd, Uptown", 3),
-        Triple("Spice Route", "321 Elm St, East Side", 4),
-        Triple("Taco Fiesta", "654 Maple Rd, West End", 5)
-    )
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var restaurant by remember { mutableStateOf<Restaurant?>(null) }
+    var showDeleteDialog by remember { mutableStateOf(false) }
 
+    LaunchedEffect(restaurantId) {
+        restaurantId?.toIntOrNull()?.let { id ->
+            val database = RestaurantDatabase.getDatabase(context)
+            val repository = RestaurantRepository(database.restaurantDao())
+            restaurant = repository.getRestaurant(id)
+        }
+    }
 
-    val restaurantTags = listOf(
-        listOf("Italian", "Pasta", "Vegetarian", "Family Friendly"),
-        listOf("Japanese", "Sushi", "Seafood", "Fine Dining"),
-        listOf("Vegan", "Organic", "Healthy", "Cafe"),
-        listOf("Indian", "Spicy", "Curry", "Takeout"),
-        listOf("Mexican", "Tacos", "Street Food", "Casual")
-    )
+    if (restaurant == null) {
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = androidx.compose.ui.Alignment.Center
+        ) {
+            CircularProgressIndicator()
+        }
+        return
+    }
 
-    //convert resutarant id toindex
-    val index = restaurantId?.toIntOrNull() ?: 0
-    val (name, address, rating) = restaurants.getOrElse(index) { restaurants[0] }
-    val tags = restaurantTags.getOrElse(index) { emptyList() }
+    val tags = restaurant!!.tags.split(",").map { it.trim() }.filter { it.isNotEmpty() }
 
     Scaffold(
         topBar = {
@@ -62,6 +66,9 @@ fun RestaurantDetailsScreen(
                     }) {
                         Icon(Icons.Default.Edit, contentDescription = "Edit")
                     }
+                    IconButton(onClick = { showDeleteDialog = true }) {
+                        Icon(Icons.Default.Delete, contentDescription = "Delete")
+                    }
                 }
             )
         }
@@ -72,39 +79,31 @@ fun RestaurantDetailsScreen(
                 .padding(padding)
                 .padding(16.dp)
         ) {
-            Text(//name and rating
-                text = name,
+            Text(
+                text = restaurant!!.name,
                 style = MaterialTheme.typography.headlineMedium
             )
             Spacer(modifier = Modifier.height(8.dp))
+            val ratingInt = restaurant!!.rating.toInt()
             Text(
-                text = "★".repeat(rating) + "☆".repeat(5 - rating) + "  ($rating.0)",
+                text = "★".repeat(ratingInt) + "☆".repeat(5 - ratingInt) + "  (${restaurant!!.rating})",
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.secondary
             )
 
             Spacer(modifier = Modifier.height(24.dp))
-            //address and phone
             Text(text = "Address:", style = MaterialTheme.typography.titleSmall)
-            Text(text = address, style = MaterialTheme.typography.bodyMedium)
+            Text(text = restaurant!!.address, style = MaterialTheme.typography.bodyMedium)
 
             Spacer(modifier = Modifier.height(16.dp))
 
             Text(text = "Phone:", style = MaterialTheme.typography.titleSmall)
-            Text(text = "(555) 123-4567", style = MaterialTheme.typography.bodyMedium)
+            Text(text = restaurant!!.phone.ifEmpty { "Not provided" }, style = MaterialTheme.typography.bodyMedium)
 
             Spacer(modifier = Modifier.height(16.dp))
-            //restaurant desc
             Text(text = "Description:", style = MaterialTheme.typography.titleSmall)
             Text(
-                text = when (index) {
-                    0 -> "Authentic Italian restaurant known for homemade pasta and cozy atmosphere."
-                    1 -> "Elegant sushi bar offering fresh sashimi and premium seafood."
-                    2 -> "Relaxed café serving vegan and organic dishes made from local ingredients."
-                    3 -> "Vibrant Indian restaurant famous for spicy curries and aromatic spices."
-                    4 -> "Colorful Mexican eatery serving tacos and classic street food favorites."
-                    else -> "A wonderful dining experience with excellent service and delicious food."
-                },
+                text = restaurant!!.description.ifEmpty { "No description provided" },
                 style = MaterialTheme.typography.bodyMedium
             )
 
@@ -119,22 +118,18 @@ fun RestaurantDetailsScreen(
 
             Spacer(modifier = Modifier.height(32.dp))
 
-            //map and share button
-            val context = LocalContext.current
-
             Button(
                 onClick = {
-                    val gmmIntentUri = Uri.parse("geo:0,0?q=${Uri.encode(address)}")
+                    val gmmIntentUri = Uri.parse("geo:0,0?q=${Uri.encode(restaurant!!.address)}")
                     val mapIntent = Intent(Intent.ACTION_VIEW, gmmIntentUri)
                     mapIntent.setPackage("com.google.android.apps.maps")
 
                     try {
                         context.startActivity(mapIntent)
                     } catch (e: ActivityNotFoundException) {
-                        // Fallback if Google Maps isn’t installed
                         val webIntent = Intent(
                             Intent.ACTION_VIEW,
-                            Uri.parse("https://www.google.com/maps/search/?api=1&query=${Uri.encode(address)}")
+                            Uri.parse("https://www.google.com/maps/search/?api=1&query=${Uri.encode(restaurant!!.address)}")
                         )
                         context.startActivity(webIntent)
                     }
@@ -146,11 +141,29 @@ fun RestaurantDetailsScreen(
                 Text("View on Map")
             }
 
-
             Spacer(modifier = Modifier.height(8.dp))
 
             OutlinedButton(
-                onClick = { /* TODO: Share functionality */ },
+                onClick = {
+                    val shareText = """
+                        Check out ${restaurant!!.name}!
+
+                        Address: ${restaurant!!.address}
+                        Phone: ${restaurant!!.phone}
+                        Rating: ${restaurant!!.rating} stars
+
+                        ${restaurant!!.description}
+
+                        Shared from Personal Restaurant Guide
+                    """.trimIndent()
+
+                    val intent = Intent(Intent.ACTION_SEND).apply {
+                        type = "text/plain"
+                        putExtra(Intent.EXTRA_SUBJECT, "Restaurant Recommendation: ${restaurant!!.name}")
+                        putExtra(Intent.EXTRA_TEXT, shareText)
+                    }
+                    context.startActivity(Intent.createChooser(intent, "Share Restaurant"))
+                },
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Icon(Icons.Default.Share, contentDescription = null)
@@ -158,5 +171,32 @@ fun RestaurantDetailsScreen(
                 Text("Share Restaurant")
             }
         }
+    }
+
+    if (showDeleteDialog) {
+        AlertDialog(
+            onDismissRequest = { showDeleteDialog = false },
+            title = { Text("Delete Restaurant") },
+            text = { Text("Are you sure you want to delete ${restaurant!!.name}?") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        scope.launch {
+                            val database = RestaurantDatabase.getDatabase(context)
+                            val repository = RestaurantRepository(database.restaurantDao())
+                            repository.delete(restaurant!!)
+                            navController.navigateUp()
+                        }
+                    }
+                ) {
+                    Text("Delete")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
     }
 }

@@ -12,51 +12,39 @@ import androidx.compose.material.icons.filled.Restaurant
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
+import ca.gbc.comp3074.assignment.data.RestaurantDatabase
+import ca.gbc.comp3074.assignment.data.RestaurantRepository
 import ca.gbc.comp3074.assignment.navigation.Screen
+import ca.gbc.comp3074.assignment.viewmodel.RestaurantListViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RestaurantListScreen(navController: NavController) {
-    //list of restaurant
-    val restaurants = remember {
-        listOf(
-            Triple("Bella Italia", "123 Main St, Downtown", 4),
-            Triple("Sushi Paradise", "456 Oak Ave, Midtown", 5),
-            Triple("Green Garden Café", "789 Pine Rd, Uptown", 3),
-            Triple("Spice Route", "321 Elm St, East Side", 4)
-        )
-    }
-
-    //tags
-    val restaurantTags = listOf(
-        listOf("Italian", "Pasta", "Vegetarian"),
-        listOf("Japanese", "Sushi", "Seafood"),
-        listOf("Vegan", "Organic", "Cafe"),
-        listOf("Indian", "Spicy", "Curry")
+    val context = LocalContext.current
+    val viewModel: RestaurantListViewModel = viewModel(
+        factory = object : androidx.lifecycle.ViewModelProvider.Factory {
+            override fun <T : androidx.lifecycle.ViewModel> create(modelClass: Class<T>): T {
+                val database = RestaurantDatabase.getDatabase(context)
+                val repository = RestaurantRepository(database.restaurantDao())
+                @Suppress("UNCHECKED_CAST")
+                return RestaurantListViewModel(repository) as T
+            }
+        }
     )
 
-    //for the search input
-    var searchQuery by rememberSaveable { mutableStateOf("") }
-
-    //search either with the name or tags
-    val filteredList = remember(searchQuery) {
-        val q = searchQuery.trim().lowercase()
-        if (q.isEmpty()) restaurants
-        else restaurants.filterIndexed { index, triple ->
-            triple.first.lowercase().contains(q) ||
-                    restaurantTags[index].any { it.lowercase().contains(q) }
-        }
-    }
+    val restaurants by viewModel.restaurants.collectAsState()
+    val searchQuery by viewModel.searchQuery.collectAsState()
 
     Scaffold(
         topBar = {
@@ -85,10 +73,9 @@ fun RestaurantListScreen(navController: NavController) {
                 .fillMaxSize()
                 .padding(padding)
         ) {
-            //filters restaurant in real time
             OutlinedTextField(
                 value = searchQuery,
-                onValueChange = { searchQuery = it },
+                onValueChange = { viewModel.updateSearchQuery(it) },
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp, vertical = 12.dp),
@@ -97,33 +84,30 @@ fun RestaurantListScreen(navController: NavController) {
                 singleLine = true
             )
 
-            // display the searched restaurants
             LazyColumn(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(bottom = 16.dp)
             ) {
-                //showing only matching restaurants
-                items(filteredList.size) { index ->
-                    val (name, address, rating) = filteredList[index]
+                items(restaurants.size) { index ->
+                    val restaurant = restaurants[index]
                     RestaurantCard(
-                        name = name,
-                        address = address,
-                        rating = rating,
+                        name = restaurant.name,
+                        address = restaurant.address,
+                        rating = restaurant.rating.toInt(),
                         backgroundColor = listOf(
                             Color(0xFFFFE5B4),
                             Color(0xFFE8F5E9),
                             Color(0xFFE3F2FD),
                             Color(0xFFFFF9C4)
                         )[index % 4],
-                        onClick = { navController.navigate(Screen.RestaurantDetails.createRoute("$index")) }
+                        onClick = { navController.navigate(Screen.RestaurantDetails.createRoute("${restaurant.id}")) }
                     )
                 }
-                //message if now restaurant found
-                if (filteredList.isEmpty()) {
+                if (restaurants.isEmpty()) {
                     item {
                         Text(
-                            text = "No restaurants found.",
+                            text = "No restaurants found. Add your first restaurant!",
                             modifier = Modifier.padding(16.dp),
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
