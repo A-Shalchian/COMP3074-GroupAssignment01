@@ -64,13 +64,11 @@ fun AboutScreen(navController: NavController) {
                 Column(
                     modifier = Modifier.padding(16.dp)
                 ) {
-                    Text("• Team Member 1", style = MaterialTheme.typography.bodyLarge)
+                    Text("• Arash Shalchian 101414035", style = MaterialTheme.typography.bodyLarge)
                     Spacer(modifier = Modifier.height(8.dp))
-                    Text("• Team Member 2", style = MaterialTheme.typography.bodyLarge)
+                    Text("• Diana Mohammadi 101481507", style = MaterialTheme.typography.bodyLarge)
                     Spacer(modifier = Modifier.height(8.dp))
-                    Text("• Team Member 3", style = MaterialTheme.typography.bodyLarge)
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text("• Team Member 4", style = MaterialTheme.typography.bodyLarge)
+                    Text("• Radin MadadNezhad Aligorkeh 101474661", style = MaterialTheme.typography.bodyLarge)
                 }
             }
 
