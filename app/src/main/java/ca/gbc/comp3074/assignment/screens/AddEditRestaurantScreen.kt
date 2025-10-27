@@ -8,8 +8,14 @@ import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
+import ca.gbc.comp3074.assignment.data.RestaurantDatabase
+import ca.gbc.comp3074.assignment.data.RestaurantRepository
+import ca.gbc.comp3074.assignment.viewmodel.AddEditRestaurantViewModel
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -17,14 +23,27 @@ fun AddEditRestaurantScreen(
     navController: NavController,
     restaurantId: String?
 ) {
+    val context = LocalContext.current
+    val viewModel: AddEditRestaurantViewModel = viewModel(
+        factory = object : androidx.lifecycle.ViewModelProvider.Factory {
+            override fun <T : androidx.lifecycle.ViewModel> create(modelClass: Class<T>): T {
+                val database = RestaurantDatabase.getDatabase(context)
+                val repository = RestaurantRepository(database.restaurantDao())
+                @Suppress("UNCHECKED_CAST")
+                return AddEditRestaurantViewModel(repository) as T
+            }
+        }
+    )
+
+    val formState by viewModel.formState.collectAsState()
+    val scope = rememberCoroutineScope()
     val isEdit = restaurantId != null
 
-    var name by remember { mutableStateOf("") }
-    var address by remember { mutableStateOf("") }
-    var phone by remember { mutableStateOf("") }
-    var description by remember { mutableStateOf("") }
-    var tags by remember { mutableStateOf("") }
-    var rating by remember { mutableFloatStateOf(0f) }
+    LaunchedEffect(restaurantId) {
+        restaurantId?.toIntOrNull()?.let { id ->
+            viewModel.loadRestaurant(id)
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -46,8 +65,8 @@ fun AddEditRestaurantScreen(
                 .verticalScroll(rememberScrollState())
         ) {
             OutlinedTextField(
-                value = name,
-                onValueChange = { name = it },
+                value = formState.name,
+                onValueChange = { viewModel.updateName(it) },
                 label = { Text("Restaurant Name") },
                 modifier = Modifier.fillMaxWidth()
             )
@@ -55,8 +74,8 @@ fun AddEditRestaurantScreen(
             Spacer(modifier = Modifier.height(16.dp))
 
             OutlinedTextField(
-                value = address,
-                onValueChange = { address = it },
+                value = formState.address,
+                onValueChange = { viewModel.updateAddress(it) },
                 label = { Text("Address") },
                 modifier = Modifier.fillMaxWidth()
             )
@@ -64,8 +83,8 @@ fun AddEditRestaurantScreen(
             Spacer(modifier = Modifier.height(16.dp))
 
             OutlinedTextField(
-                value = phone,
-                onValueChange = { phone = it },
+                value = formState.phone,
+                onValueChange = { viewModel.updatePhone(it) },
                 label = { Text("Phone Number") },
                 modifier = Modifier.fillMaxWidth()
             )
@@ -73,8 +92,8 @@ fun AddEditRestaurantScreen(
             Spacer(modifier = Modifier.height(16.dp))
 
             OutlinedTextField(
-                value = description,
-                onValueChange = { description = it },
+                value = formState.description,
+                onValueChange = { viewModel.updateDescription(it) },
                 label = { Text("Description") },
                 modifier = Modifier.fillMaxWidth(),
                 minLines = 3
@@ -83,8 +102,8 @@ fun AddEditRestaurantScreen(
             Spacer(modifier = Modifier.height(16.dp))
 
             OutlinedTextField(
-                value = tags,
-                onValueChange = { tags = it },
+                value = formState.tags,
+                onValueChange = { viewModel.updateTags(it) },
                 label = { Text("Tags (comma separated)") },
                 placeholder = { Text("e.g. Italian, Vegetarian, Organic") },
                 modifier = Modifier.fillMaxWidth()
@@ -92,10 +111,10 @@ fun AddEditRestaurantScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            Text("Rating: ${rating.toInt()} stars")
+            Text("Rating: ${formState.rating.toInt()} stars")
             Slider(
-                value = rating,
-                onValueChange = { rating = it },
+                value = formState.rating,
+                onValueChange = { viewModel.updateRating(it) },
                 valueRange = 0f..5f,
                 steps = 4,
                 modifier = Modifier.fillMaxWidth()
@@ -105,8 +124,11 @@ fun AddEditRestaurantScreen(
 
             Button(
                 onClick = {
-                    // TODO: Save restaurant
-                    navController.navigateUp()
+                    scope.launch {
+                        if (viewModel.saveRestaurant()) {
+                            navController.navigateUp()
+                        }
+                    }
                 },
                 modifier = Modifier.fillMaxWidth()
             ) {
