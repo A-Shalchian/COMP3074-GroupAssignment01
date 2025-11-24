@@ -147,22 +147,29 @@ fun RestaurantDetailsScreen(
                 onClick = {
                     val shareText = """
                         Check out ${restaurant!!.name}!
-
+            
                         Address: ${restaurant!!.address}
                         Phone: ${restaurant!!.phone}
                         Rating: ${restaurant!!.rating} stars
-
+            
                         ${restaurant!!.description}
-
+            
                         Shared from Personal Restaurant Guide
-                    """.trimIndent()
+                         """.trimIndent()
 
-                    val intent = Intent(Intent.ACTION_SEND).apply {
-                        type = "text/plain"
+                    // Force email apps to appear (Gmail, Outlook, etc.)
+                    val emailIntent = Intent(Intent.ACTION_SEND).apply {
+                        type = "message/rfc822"        // Important: email-only MIME type
+                        putExtra(Intent.EXTRA_EMAIL, arrayOf(""))
                         putExtra(Intent.EXTRA_SUBJECT, "Restaurant Recommendation: ${restaurant!!.name}")
                         putExtra(Intent.EXTRA_TEXT, shareText)
                     }
-                    context.startActivity(Intent.createChooser(intent, "Share Restaurant"))
+
+                    try {
+                        context.startActivity(Intent.createChooser(emailIntent, "Share via"))
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                    }
                 },
                 modifier = Modifier.fillMaxWidth()
             ) {
@@ -170,6 +177,7 @@ fun RestaurantDetailsScreen(
                 Spacer(modifier = Modifier.width(8.dp))
                 Text("Share Restaurant")
             }
+
         }
     }
 

@@ -16,6 +16,7 @@ import ca.gbc.comp3074.assignment.data.RestaurantDatabase
 import ca.gbc.comp3074.assignment.data.RestaurantRepository
 import ca.gbc.comp3074.assignment.viewmodel.AddEditRestaurantViewModel
 import kotlinx.coroutines.launch
+import androidx.compose.foundation.layout.FlowRow
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -39,9 +40,31 @@ fun AddEditRestaurantScreen(
     val scope = rememberCoroutineScope()
     val isEdit = restaurantId != null
 
+    // ------------------------------
+    // NEW TAG SYSTEM ADDED HERE
+    // ------------------------------
+    val availableTags = listOf(
+        "Italian", "Vegan", "Cafe", "Dessert", "Fast Food",
+        "Breakfast", "Seafood", "BBQ", "Healthy", "Asian", "Mexican"
+    )
+
+    var selectedTags by remember {
+        mutableStateOf(
+            formState.tags.split(",")
+                .map { it.trim() }
+                .filter { it.isNotEmpty() }
+        )
+    }
+    // ------------------------------
+
     LaunchedEffect(restaurantId) {
         restaurantId?.toIntOrNull()?.let { id ->
             viewModel.loadRestaurant(id)
+
+            // Update selected tags after loading existing restaurant
+            selectedTags = formState.tags.split(",")
+                .map { it.trim() }
+                .filter { it.isNotEmpty() }
         }
     }
 
@@ -101,13 +124,41 @@ fun AddEditRestaurantScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            OutlinedTextField(
-                value = formState.tags,
-                onValueChange = { viewModel.updateTags(it) },
-                label = { Text("Tags (comma separated)") },
-                placeholder = { Text("e.g. Italian, Vegetarian, Organic") },
-                modifier = Modifier.fillMaxWidth()
-            )
+            // ------------------------------
+            // NEW TAG UI — REPLACES OLD TEXTFIELD
+            // ------------------------------
+            Text("Select Tags:", style = MaterialTheme.typography.titleMedium)
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                availableTags.forEach { tag ->
+                    val isSelected = selectedTags.contains(tag)
+
+                    AssistChip(
+                        onClick = {
+                            selectedTags = if (isSelected) {
+                                selectedTags - tag
+                            } else {
+                                selectedTags + tag
+                            }
+                            viewModel.updateTags(selectedTags.joinToString(", "))
+                        },
+                        label = { Text(tag) },
+                        colors = AssistChipDefaults.assistChipColors(
+                            containerColor = if (isSelected)
+                                MaterialTheme.colorScheme.primaryContainer
+                            else
+                                MaterialTheme.colorScheme.surfaceVariant,
+                            labelColor = if (isSelected)
+                                MaterialTheme.colorScheme.onPrimaryContainer
+                            else
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    )
+                }
+            }
+            // ------------------------------
 
             Spacer(modifier = Modifier.height(16.dp))
 
